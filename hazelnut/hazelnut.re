@@ -218,8 +218,67 @@ and ana = (ctx: typctx, e: hexp, t: htyp): bool => {
   };
 };
 
-let syn_action =
-    (ctx: typctx, (e: zexp, t: htyp), a: action): option((zexp, htyp)) => {
+let rec typ_action = (t: ztyp, a: action): option(ztyp) => {
+  switch (a) {
+  | Move(dr) =>
+    switch (dr) {
+    | Child(ch) =>
+      switch (t) {
+      | Cursor(Arrow(t1, t2)) =>
+        switch (ch) {
+        | One => Some(LArrow(Cursor(t1), t2))
+        | Two => Some(RArrow(t1, Cursor(t2)))
+        }
+      | _ => zipper_typ_action(t, a)
+      }
+    | Parent =>
+      switch (t) {
+      | LArrow(Cursor(t1), t2)
+      | RArrow(t1, Cursor(t2)) => Some(Cursor(Arrow(t1, t2)))
+      | _ => zipper_typ_action(t, a)
+      }
+    }
+  | Construct(sp) =>
+    switch (sp) {
+    | Arrow =>
+      switch (t) {
+      | Cursor(t1) => Some(RArrow(t1, Cursor(Hole)))
+      | _ => zipper_typ_action(t, a)
+      }
+    | Num =>
+      switch (t) {
+      | Cursor(Hole) => Some(Cursor(Num))
+      | _ => zipper_typ_action(t, a)
+      }
+    | _ => None
+    }
+  | Del =>
+    switch (t) {
+    | Cursor(_) => Some(Cursor(Hole))
+    | _ => zipper_typ_action(t, a)
+    }
+  | _ => None
+  };
+}
+
+and zipper_typ_action = (t: ztyp, a: action): option(ztyp) => {
+  switch (t) {
+  | LArrow(zt, ht) =>
+    switch (typ_action(zt, a)) {
+    | Some(zt_new) => Some(LArrow(zt_new, ht))
+    | _ => None
+    }
+  | RArrow(ht, zt) =>
+    switch (typ_action(zt, a)) {
+    | Some(zt_new) => Some(RArrow(ht, zt_new))
+    | _ => None
+    }
+  | _ => None
+  };
+};
+
+let rec syn_action =
+        (ctx: typctx, (e: zexp, t: htyp), a: action): option((zexp, htyp)) => {
   // Used to suppress unused variable warnings
   // Okay to remove
   let _ = ctx;
